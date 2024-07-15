@@ -1,0 +1,23 @@
+CAMERAS:
+  1: ["front", "f"]
+  2: ["front_left", "fl"]
+  3: ["front_right", "fr"]
+  4: ["left_shoulder", "ls"]
+  5: ["right_shoulder", "rs"]
+  6: ["overhead", "oh"]
+
+PATHS:
+  root : "/mnt/share/nas/Projects/Espresso/Data"
+  intrinsics_out_file: "CAMERAS"
+  extrinsics_out_file: "IMAGES"
+
+DATASET:
+  img_size: 512
+  depth_in_m: False
+  masks_as_one_channel: False
+  num_demos: -1 # -1 loads all
+  variations: [0]
+  task: "slide_block_to_target"
+  mask_ids: [43,45,49,84,65535]
+
+SAVE_INIT_PLY: True
