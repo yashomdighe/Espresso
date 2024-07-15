@@ -3,24 +3,20 @@ import yaml
 import os
 from pathlib import Path
 import cv2
-from rlbench.backend.const import *
-from tqdm import tqdm, trange
+import open3d as o3d
 
+from tqdm import tqdm
 from PIL import Image
-from natsort import natsorted
+from scipy.spatial.transform import Rotation as R
+from typing import Tuple
+
 from pyrep.objects import VisionSensor
-from rlbench.action_modes.action_mode import MoveArmThenGripper
-from rlbench.action_modes.arm_action_modes import JointVelocity
-from rlbench.action_modes.gripper_action_modes import Discrete
-from rlbench.environment import Environment
+
+from rlbench.backend.const import *
 from rlbench.observation_config import ObservationConfig, CameraConfig
-from rlbench.tasks import SlideBlockToTarget
 from rlbench.backend.utils import image_to_float_array, rgb_handles_to_mask
 from rlbench.utils import get_stored_demos
 
-from scipy.spatial.transform import Rotation as R
-import open3d as o3d
-from typing import Tuple
 
 
 def make_colmap_camera_params(intrinsics: np.ndarray, 
@@ -114,18 +110,6 @@ if __name__=="__main__":
     )
     obs_config.set_all(True)
     obs_cfg_dict = vars(obs_config)
-    # print(f'Creating RLBench env...')
-
-    # action_mode=MoveArmThenGripper(
-    #     arm_action_mode=JointVelocity(), 
-    #     gripper_action_mode=Discrete())
-
-    # env = Environment(action_mode, str(rlbench_data_path), obs_config)
-    # print(f"Launching environment")
-    # env.launch()
-
-    # print(f"Setting Task")
-    # rlbench_task = env.get_task(SlideBlockToTarget)
 
     output_root = os.path.join(path_cfg["root"], "gaussian-splatting")
 
@@ -150,8 +134,8 @@ if __name__=="__main__":
         print(f"Obtained RLBench saved demos")
         print(f"Processing demos")
 
-        for episode_idx in trange(len(demos), desc="episode"):
-            for timestep, demo in tqdm(enumerate(demos[episode_idx]), total=len(demos[episode_idx]), desc="timestep"):
+        for episode_idx in range(len(demos)):
+            for timestep, demo in tqdm(enumerate(demos[episode_idx]), total=len(demos[episode_idx]), desc=f"episode {episode_idx}/{len(demos)}"):
                 demo_dict = vars(demo)
                 # for k, v in demo_dict.items():
                 #     print(f"{k}: {type(v)}")
@@ -239,7 +223,7 @@ if __name__=="__main__":
                            fmt="%s %s %s %s %s %s %s %s %s %s\n")
                 
                 if save_ply & (timestep == 0):
-                    print(f"\nSaving initial pcd as ply")
+                    tqdm.write(f"Saving initial pcd for episode {episode_idx}")
                     o3d.io.write_point_cloud(os.path.join(task_output_path, f"variation_{variation}", f"episode_{episode_idx}", "init_pcd.ply"), pcd)
         #         break
         #     break
