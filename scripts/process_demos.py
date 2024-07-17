@@ -130,12 +130,14 @@ if __name__=="__main__":
                                  variation_number=variation,
                                  image_paths=True,
                                  task_name=task,
-                                 obs_config=obs_config)
+                                 obs_config=obs_config,
+                                 random_selection=False)
+        
         print(f"Obtained RLBench saved demos")
         print(f"Processing demos")
 
         for episode_idx in range(len(demos)):
-            for timestep, demo in tqdm(enumerate(demos[episode_idx]), total=len(demos[episode_idx]), desc=f"episode {episode_idx}/{len(demos)}"):
+            for timestep, demo in tqdm(enumerate(demos[episode_idx]), total=len(demos[episode_idx]), desc=f"Episode {episode_idx+1}/{len(demos)}"):
                 demo_dict = vars(demo)
                 # for k, v in demo_dict.items():
                 #     print(f"{k}: {type(v)}")
@@ -193,7 +195,7 @@ if __name__=="__main__":
                     
                     intrinsics, extrinsics = make_colmap_camera_params(
                         misc_dict[f"{cam[0]}_camera_intrinsics"],
-                        cam_ext.T,
+                        np.linalg.inv(cam_ext),
                         cam_id,
                         cam[1],
                         img_size
