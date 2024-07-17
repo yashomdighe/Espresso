@@ -16,25 +16,6 @@ from rlbench.observation_config import ObservationConfig, CameraConfig
 from rlbench.backend.utils import image_to_float_array, rgb_handles_to_mask
 from rlbench.utils import get_stored_demos
 
-def filter_and_downsample_pcd(points: np.ndarray, colors: np.ndarray):
-    # distances = np.linalg.norm(points, axis=1)
-    # points = np.dot(Ry[:3,:3], np.dot(Rx[:3,:3], points.T)).T
-    # indices = np.where((distances <= 2) # Filter by distance from origin
-    #                    & (points[:, 1] > .5)  # Filter by height
-    #                 # The two conditions below are needed for the setup for dynamic 3d gaussians where walls are super close
-    #                 #    &((points[:, 2] < 0.8) & (points[:,2] > -1.1))  # Explicity Remove walls in the front and back
-    #                 #    & ((points[:, 0] < 0.8) & (points[:,0] > -0.8)) # Explicitly Remove walls on the sides
-    #                 ) 
-    # filtered_points = points[indices]
-    # filtered_colors = colors[indices]
-    # filtered_points = points
-    # filtered_colors = colors
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    pcd.colors = o3d.utility.Vector3dVector(colors)
-
-    return pcd.voxel_down_sample(voxel_size=0.01)
-
 if __name__=="__main__":
 
     # Transforms from rlbench convention to colmap convention
