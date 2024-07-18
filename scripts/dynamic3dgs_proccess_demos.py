@@ -61,7 +61,7 @@ if __name__=="__main__":
     obs_config.set_all(True)
     obs_cfg_dict = vars(obs_config)
 
-    output_root = os.path.join(path_cfg["root"], "dynamic_3dgs")
+    output_root = os.path.join(path_cfg["root"], "dynamic_3dgs", "input")
 
     if not os.path.exists(output_root):
         os.makedirs(output_root)
