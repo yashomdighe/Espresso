@@ -2,3 +2,5 @@
 *.ply
 *.png
 *.pyc
+dev.py
+/data
