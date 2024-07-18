@@ -178,7 +178,8 @@ if __name__=="__main__":
 
                 # break
                 if timestep == 0:
-                    
+                    points = np.vstack(points)
+                    colors = np.vstack(colors)
                     pcd = o3d.geometry.PointCloud()
                     pcd.points = o3d.utility.Vector3dVector(points)
                     pcd.colors = o3d.utility.Vector3dVector(colors)
