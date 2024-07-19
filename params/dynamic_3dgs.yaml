@@ -14,7 +14,7 @@ DATASET:
   img_size: 512
   depth_in_m: False
   masks_as_one_channel: False
-  num_demos: 1 # -1 loads all
+  num_demos: -1 # -1 loads all
   variations: [0]
   task: "slide_block_to_target"
   # mask_ids: [10, 43,45,49,84,65535]
