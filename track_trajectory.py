@@ -8,7 +8,7 @@ from typing import Tuple
 import pink
 from pink import solve_ik
 import pinocchio as pin # type: ignore
-from pink.tasks import FrameTask, PostureTask
+from pink.tasks import FrameTask
 from pink.utils import custom_configuration_vector
 from pink.visualization import start_meshcat_visualizer
 
@@ -80,12 +80,23 @@ if __name__ == "__main__":
     pin.forwardKinematics(model, data, q_ref)
     pin.updateFramePlacements(model, data)
 
-    # Load and get links and pts from the gs
-    ROOT = '/mnt/share/nas/Projects/Espresso/Data/dynamic_3dgs'
-    exp = "test_15"
-    seq = "slide_block_to_target/episode_0"
-    path = os.path.join(ROOT, "output", str(seq), str(exp))
-    points, links, indices = assign_links(path, True)
+
+    # TO DO: Do this using os.path
+    read_from_file = True
+
+    if read_from_file:
+        data = np.loadtxt("sampled_pts.txt")
+        points = data[:,:3]
+        links = data[:,3][...,None]
+        indices = data[:,4][...,None]
+    else: 
+        # Load and get links and pts from the gs
+        ROOT = '/mnt/share/nas/Projects/Espresso/Data/dynamic_3dgs'
+        exp = "test_15"
+        seq = "slide_block_to_target/episode_0"
+        path = os.path.join(ROOT, "output", str(seq), str(exp))
+        points, links, indices = assign_links(path, True)
+    
 
     # print(indices.shape)
     # Randomly? Choose N points per link in the gs
@@ -95,28 +106,32 @@ if __name__ == "__main__":
 
     skip = [0.0, 9.0, 10.0]
     frames = {}
-    # viz = start_meshcat_visualizer(robot)
     # Create frames from the centers
     for center in centers:
-        # print(np.append(center, 1).reshape(-1,1).shape)
-        coords = transfrom_3dgs_to_pin@np.append(center[:3], 1).reshape(-1,1)
-        tf = np.hstack([np.vstack([np.eye(3), np.zeros((1,3))])])
         link = center[3:][0]
-
-        frames[f"pt{int(link)}"] = tf
         if link in skip:
             continue
+        coords = transfrom_3dgs_to_pin@np.append(center[:3], 1).reshape(-1,1)
+        tf = np.hstack([np.vstack([np.eye(3), np.zeros((1,3))]), coords])
+        frames[f"pt{int(link)}"] = tf
+        # print(coords.T, link)
 
-    
-        # print(coords, link)
+    viz = start_meshcat_visualizer(robot)
 
-    # for k, v in frames.items():
+    viewer = viz.viewer
+    for k, v in frames.items():
+        # print(f"{k}:{v}")
+        meshcat_shapes.frame(viewer[k], opacity=0.5)
+        viewer[k].set_transform(v)
 
 
 
         # Create and add frame to body
         # Create task and add to list
-    
+    viz.display(q_ref)
+    while True: 
+        pass
+        
 
     # Set task targets
     # Solve IK
