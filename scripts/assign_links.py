@@ -39,7 +39,7 @@ def get_franka_pcd(joint_config: np.ndarray ) -> Tuple[o3d.geometry.PointCloud, 
 
     return pcd, links
 
-def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
     """
     Assign a robot link to individual 3d gaussians on gaussian splat
@@ -125,8 +125,10 @@ def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray
 
             links.append(link[0])
         # break
-    np.savetxt("sampled_pts.txt", np.hstack([np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)]))
-    return np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)
+    if save:
+        np.savetxt("sampled_pts.txt", np.hstack([np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)]))
+        np.savetxt("transform.txt", reg_p2p.transformation)
+    return np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1), reg_p2p.transformation
     
     # assign the color based on the links using a colormap
     # with open("link_color_map.yaml", "r") as f:

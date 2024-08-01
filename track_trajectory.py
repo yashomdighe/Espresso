@@ -44,15 +44,15 @@ def choose_frames_centers(points, links, indices, num_pts: int = 1) -> Tuple[np.
     return np.hstack((np.array(centers), np.array(parents)[...,None])), np.array(idx)
 
 
-def compute_tranform_3dgs_to_pin() -> np.ndarray:
+def compute_tranform_3dgs_to_pin(tf) -> np.ndarray:
     
-    t_vec = np.array([-2.981e-01, -1.27797e-02, +7.2005e-01])
-    t = np.vstack([np.hstack([np.eye(3), t_vec.reshape(-1,1)]), np.array([0, 0, 0, 1])])
-    Rx = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
-    Ry = np.array([[0, 0, 1, 0], [0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
-    transform = Ry@Rx@t
-    R = transform[:3,:3].T
-    T= -1*R@transform[:3,3]
+    # t_vec = np.array([-2.981e-01, -1.27797e-02, +7.2005e-01])
+    # t = np.vstack([np.hstack([np.eye(3), t_vec.reshape(-1,1)]), np.array([0, 0, 0, 1])])
+    # Rx = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+    # Ry = np.array([[0, 0, 1, 0], [0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
+    # transform = Ry@Rx@t
+    R = tf[:3,:3].T
+    T= -1*R@tf[:3,3]
     X = np.vstack((np.hstack((R,T[:3].reshape(-1,1))), np.array([0,0,0,1])))
 
     return X
@@ -85,13 +85,13 @@ if __name__ == "__main__":
     exp = "test_15"
     seq = "slide_block_to_target/episode_0"
     path = os.path.join(ROOT, "output", str(seq), str(exp))
-    points, links, indices = assign_links(path, True)
+    points, links, indices, transform = assign_links(path, True)
 
     # print(indices.shape)
     # Randomly? Choose N points per link in the gs
     centers, idx = choose_frames_centers(points, links, indices)
 
-    transfrom_3dgs_to_pin = compute_tranform_3dgs_to_pin()
+    transfrom_3dgs_to_pin = compute_tranform_3dgs_to_pin(transform)
 
     skip = [0.0, 9.0, 10.0]
     frames = {}
