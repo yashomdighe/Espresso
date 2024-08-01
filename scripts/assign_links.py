@@ -74,7 +74,9 @@ def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray
     # Need to sample cleverly. Perhaps based on the average kdtree distances?
     filtered_points0 = t0_points[indices0]
     indices1 = np.where(filtered_points0[:, 2] > -0.3)
-    filtered_points = filtered_points0[indices1]
+    # filtered_points = filtered_points0[indices1]
+    filtered_points = filtered_points0
+
 
     gs_pcd = o3d.geometry.PointCloud()
     gs_pcd.points = o3d.utility.Vector3dVector(np.ascontiguousarray(filtered_points))
@@ -112,19 +114,21 @@ def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray
     for i in range(len(filtered_points)):
         # TO DO Filter based on distances
         [k, idx, dist] = sampled_tree.search_knn_vector_3d(filtered_points[i], 100)
-        
-
+        # print(np.mean(np.ascontiguousarray(dist)))
         # get the unique values for links of the neighbours
         link, _ = np.unique(sampled_links[(np.asarray(idx))], return_counts=True)
 
         # We only keep a point if there all neighbours have the same link
-        if len(link) == 1:
+        if len(link) == 1 and np.mean(np.ascontiguousarray(dist)) < 0.001:
             indices.append(i)
 
             points.append(filtered_points[i])
 
             links.append(link[0])
         # break
+    
+    
+    # exit(1)
     if save:
         np.savetxt("sampled_pts.txt", np.hstack([np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)]))
         np.savetxt("transform.txt", reg_p2p.transformation)
@@ -150,7 +154,7 @@ if __name__=="__main__":
     seq = "slide_block_to_target/episode_0"
     path = os.path.join(ROOT, "output", str(seq), str(exp))
     
-    points, links, indices = assign_links(path)
+    points, links, indices, transform = assign_links(path)
 
     # assign the color based on the links using a colormap
     with open("link_color_map.yaml", "r") as f:
