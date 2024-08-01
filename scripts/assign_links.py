@@ -111,7 +111,7 @@ def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray
     indices = []
     for i in range(len(filtered_points)):
         # TO DO Filter based on distances
-        [k, idx, dist] = sampled_tree.search_knn_vector_3d(filtered_points[i], 20)
+        [k, idx, dist] = sampled_tree.search_knn_vector_3d(filtered_points[i], 100)
         
 
         # get the unique values for links of the neighbours
