@@ -9,7 +9,7 @@ from typing import Tuple
 from robofin import samplers
 from robofin.robot_constants import FrankaConstants
 
-def get_gaussian_centers(params: dict,  timestep: int) -> Tuple[np.ndarray, np.ndarray]:
+def get_gaussian_centers(params: dict,  timestep: int = 0) -> Tuple[np.ndarray, np.ndarray]:
     
     points = np.ascontiguousarray(params["means3D"][timestep]).astype(float)
     colors = np.ascontiguousarray(params["rgb_colors"][timestep]).astype(float)
@@ -39,7 +39,7 @@ def get_franka_pcd(joint_config: np.ndarray ) -> Tuple[o3d.geometry.PointCloud, 
 
     return pcd, links
 
-def assign_links(path : str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     """
     Assign a robot link to individual 3d gaussians on gaussian splat
@@ -98,8 +98,8 @@ def assign_links(path : str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000)
     )
     print(reg_p2p)
-    print("Transformation is:")
-    print(reg_p2p.transformation)
+    # print("Transformation is:")
+    # print(reg_p2p.transformation)
 
     # Apply the transfrom to transform the sampled_pcd into the frame of gs_pcd
     sampled_pcd.transform(reg_p2p.transformation)
@@ -125,7 +125,7 @@ def assign_links(path : str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
             links.append(link[0])
         # break
-    
+    np.savetxt("sampled_pts.txt", np.hstack([np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)]))
     return np.array(points), np.array(links).reshape(-1,1), np.array(indices).reshape(-1,1)
     
     # assign the color based on the links using a colormap
