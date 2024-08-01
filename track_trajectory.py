@@ -89,13 +89,16 @@ if __name__ == "__main__":
         points = data[:,:3]
         links = data[:,3][...,None]
         indices = data[:,4][...,None]
+        
+        transform = np.loadtxt("transform.txt")
+        
     else: 
         # Load and get links and pts from the gs
         ROOT = '/mnt/share/nas/Projects/Espresso/Data/dynamic_3dgs'
         exp = "test_15"
         seq = "slide_block_to_target/episode_0"
         path = os.path.join(ROOT, "output", str(seq), str(exp))
-        points, links, indices = assign_links(path, True)
+        points, links, indices, transform = assign_links(path, True)
     
 
     # print(indices.shape)
