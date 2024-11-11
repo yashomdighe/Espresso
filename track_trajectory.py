@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
 
     # TO DO: Do this using os.path
-    read_from_file = True
+    read_from_file = False
 
     if read_from_file:
         data = np.loadtxt("sampled_pts.txt")
@@ -119,21 +119,21 @@ if __name__ == "__main__":
         frames[f"pt{int(link)}"] = tf
         # print(coords.T, link)
 
-    viz = start_meshcat_visualizer(robot)
+    # viz = start_meshcat_visualizer(robot)
 
-    viewer = viz.viewer
-    for k, v in frames.items():
-        # print(f"{k}:{v}")
-        meshcat_shapes.frame(viewer[k], opacity=0.5)
-        viewer[k].set_transform(v)
+    # viewer = viz.viewer
+    # for k, v in frames.items():
+    #     # print(f"{k}:{v}")
+    #     meshcat_shapes.frame(viewer[k], opacity=0.5)
+    #     viewer[k].set_transform(v)
 
 
 
-        # Create and add frame to body
-        # Create task and add to list
-    viz.display(q_ref)
-    while True: 
-        pass
+    #     # Create and add frame to body
+    #     # Create task and add to list
+    # viz.display(q_ref)
+    # while True: 
+    #     pass
         
 
     # Set task targets

@@ -66,7 +66,7 @@ def assign_links(path : str, save: bool = False) -> Tuple[np.ndarray, np.ndarray
     # print(transform_init)
 
     sampled_pcd, sampled_links = get_franka_pcd(np.array(init_joint_positions))
-    t0_points, t0_colors, t0_seg = get_gaussian_centers(params, 0)
+    t0_points, t0_colors, t0_seg = get_gaussian_centers(params, 10)
  
     del params, t0_colors
     indices0 = (t0_seg == np.array([1., 0., 0,])).all(axis=1)
