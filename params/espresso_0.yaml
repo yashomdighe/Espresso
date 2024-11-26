@@ -7,7 +7,9 @@ CAMERAS:
   6: ["overhead", "oh"]
 
 PATHS:
+  # root : "/mnt/share/nas/Projects/Espresso/Data"
   root : "/home/ydighe/Developer/datasets"
+  # meta_file : "train_meta"
   intrinsics_out_file: "CAMERAS"
   extrinsics_out_file: "IMAGES"
 
@@ -18,6 +20,7 @@ DATASET:
   num_demos: -1 # -1 loads all
   variations: [0]
   task: "slide_block_to_target"
-  mask_ids: [43,45,49,84,65535]
+  # mask_ids: [10, 43,45,49,84,65535]
+  mask_ids: [10,48,52,53,54,55,56,91,65535]
 
 SAVE_INIT_PLY: True
