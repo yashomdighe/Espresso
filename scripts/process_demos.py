@@ -53,8 +53,8 @@ def filter_and_downsample_pcd(points: np.ndarray, colors: np.ndarray, Rx: np.nda
     indices = np.where((distances <= 2) # Filter by distance from origin
                        & (points[:, 1] > .5)  # Filter by height
                     # The two conditions below are needed for the setup for dynamic 3d gaussians where walls are super close
-                    #    &((points[:, 2] < 0.8) & (points[:,2] > -1.1))  # Explicity Remove walls in the front and back
-                    #    & ((points[:, 0] < 0.8) & (points[:,0] > -0.8)) # Explicitly Remove walls on the sides
+                       &((points[:, 2] < 0.8) & (points[:,2] > -1.1))  # Explicity Remove walls in the front and back
+                       & ((points[:, 0] < 0.8) & (points[:,0] > -0.8)) # Explicitly Remove walls on the sides
                     ) 
     filtered_points = points[indices]
     filtered_colors = colors[indices]
@@ -82,7 +82,7 @@ if __name__=="__main__":
     cameras= cfg["CAMERAS"]
 
     path_cfg = cfg["PATHS"]
-    rlbench_data_path = Path.joinpath(Path(path_cfg["root"]), "RLBench_raw")
+    rlbench_data_path = Path.joinpath(Path(path_cfg["root"]), "rlbench_raw_nobg")
     
     dataset_cfg = cfg["DATASET"]
     img_size = dataset_cfg["img_size"]
@@ -163,8 +163,8 @@ if __name__=="__main__":
                 for cam_id, cam in cameras.items():
 
                     rgb = np.array(Image.open(demo_dict[f"{cam[0]}_rgb"]))
-                    mask = rgb_handles_to_mask(np.array(Image.open(demo_dict[f"{cam[0]}_mask"])))                    # print(mask)
-                    obj_ids = list(np.unique(mask))
+                    # mask = rgb_handles_to_mask(np.array(Image.open(demo_dict[f"{cam[0]}_mask"])))                    # print(mask)
+                    # obj_ids = list(np.unique(mask))
 
                     misc_dict = demo_dict["misc"]
                     depth_img = image_to_float_array(
@@ -190,8 +190,8 @@ if __name__=="__main__":
                     rgb = make_bg_transparent(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
                     cv2.imwrite(os.path.join(im_path,f"{cam[1]}.png"), rgb)
 
-                    mask_img = 1 - np.isin(mask, mask_ids).astype(np.uint8)
-                    cv2.imwrite(os.path.join(im_path,f"{cam[1]}_mask.png"), mask_img*255)
+                    # mask_img = 1 - np.isin(mask, mask_ids).astype(np.uint8)
+                    # cv2.imwrite(os.path.join(im_path,f"{cam[1]}_mask.png"), mask_img*255)
                     
                     intrinsics, extrinsics = make_colmap_camera_params(
                         misc_dict[f"{cam[0]}_camera_intrinsics"],

@@ -16,7 +16,7 @@ def l1_loss(network_output, gt):
 #         self.clip_encoder = clip_model
 
 if __name__ == "__main__":
-
+    
     pretrained_model = "openai/clip-vit-large-patch14"
     tokenizer = CLIPTokenizer.from_pretrained(pretrained_model)
     # text_encoder = CLIPModel.from_pretrained(pretrained_model)
@@ -48,5 +48,8 @@ if __name__ == "__main__":
     # e1 = mha2(pcd_emb, pcd_emb, text_emb)
     proj_text = proj(text_emb)
     print(f"proj_text: {proj_text.size()}")
-    e1 = mha2(pcd_emb, pcd_emb, proj_text)
+    e1 = mha2(proj_text, pcd_emb, pcd_emb)
     e2 = mha2(e1, e1, e1)
+    print(f"e1: {e1.size()}")
+    print(f"e1: {e1[0]}")
+    print(f"e2: {e2.size()}")
