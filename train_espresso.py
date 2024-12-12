@@ -14,6 +14,7 @@ from data_scripts.espresso_dataloader import EspressoDataset
 
 from torch.utils.data import DataLoader
 
+torch.set_float32_matmul_precision('medium')
 
 def custom_collate_fn(batch):
     """
@@ -29,9 +30,11 @@ def custom_collate_fn(batch):
     FovX_batch = [item[6] for item in batch][0]  # Stack FovX tensors
     FovY_batch = [item[7] for item in batch][0]  # Stack FovY tensors
 
-    print(task_desc_batch,  type(task_desc_batch))
+    # print(task_desc_batch,  type(task_desc_batch))
+    print(f"fovx in collate :{FovX_batch}")
+    print(f"fovy in collate :{FovY_batch}")
 
-    return (G_batch, target_batch,task_desc_batch, FovX_batch, FovY_batch, 
+    return (G_batch, target_batch, task_desc_batch, FovX_batch, FovY_batch, 
             world_view_transform_batch, full_proj_transform_batch, 
             camera_center_batch)
 
@@ -44,6 +47,7 @@ if __name__ == "__main__":
     text_encoder = CLIPTextModelWithProjection.from_pretrained(pretrained_model)
     text_encoder.requires_grad_(False)
     text_encoder.eval() 
+    text_encoder.to("cuda")
 
     print(f"Created text encoder")
 
@@ -52,6 +56,8 @@ if __name__ == "__main__":
     pcd_encoder.load_state_dict(checkpoint['model_state_dict'])
     pcd_encoder.eval()
     pcd_encoder.requires_grad_(False)
+    pcd_encoder.to("cuda")
+    # model.fc = nn.Linear(model.fc.in_features, num_classes)
 
     pcd_encoder.fc3 = nn.Linear(256, d_model)
 
@@ -66,18 +72,18 @@ if __name__ == "__main__":
     print(f"Created model")
     # dummy_input = (splat, torch.ones(splat_dims[0]), task_desc)
 
-    train_set = EspressoDataset("train_paths.csv")
-    val_set = EspressoDataset("val_paths.csv")
+    train_set = EspressoDataset("train_paths.csv", target_size=150000)
+    val_set = EspressoDataset("val_paths.csv", target_size=150000)
 
-    train_loader = DataLoader(train_set, batch_size=1, shuffle=True, collate_fn=custom_collate_fn)
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, collate_fn=custom_collate_fn)
+    train_loader = DataLoader(train_set, batch_size=1, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False)
     print("Obtained train set")
     # splat, image, task_desc ,world_view_transform, full_proj_transform, camera_center, FovX, FovY = next(iter(train_set))
     # summary(model, [splat, task_desc, FovX, FovY, world_view_transform, full_proj_transform, camera_center])
     # summary(model)
 
     # Trainer
-    trainer = L.Trainer(accelerator="cpu", 
+    trainer = L.Trainer(accelerator="auto", 
                         devices=1,
                         # logger=wandb_logger,
                         max_epochs=50,

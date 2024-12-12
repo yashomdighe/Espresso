@@ -29,9 +29,9 @@ class MultiHeadedAttention(nn.Module):
         ]
 
         # Scaled dot product attention
-        dk1 = query.size(-1)
-        print(f"d_k: {self.d_k}, dk1: {dk1}")
-        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(dk1)
+        # dk1 = query.size(-1)
+        # print(f"d_k: {self.d_k}, dk1: {dk1}")
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(self.d_k)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1e9)
         p_attn = scores.softmax(dim=-1)
