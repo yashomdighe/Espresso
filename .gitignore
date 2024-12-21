@@ -2,5 +2,10 @@
 *.ply
 *.png
 *.pyc
+*.pth
+*.pt
 /build
 /*.egg-info
+/wandb
+/weights
+/lightning_logs
