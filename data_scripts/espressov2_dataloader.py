@@ -54,7 +54,7 @@ def pad_rotations(rotations, target_size):
     current_size = rotations.size(0)
     if current_size < target_size:
         # Create padding tensor with [1, 0, 0, 0]
-        rotation_padding = torch.tensor([0, 0, 0, 1], dtype=rotations.dtype, device=rotations.device)
+        rotation_padding = torch.tensor([1, 0, 0, 0], dtype=rotations.dtype, device=rotations.device)
         padding = rotation_padding.repeat(target_size - current_size, 1)
         padded_rotations = torch.cat([rotations, padding], dim=0)
     else:

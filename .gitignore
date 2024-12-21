@@ -9,3 +9,9 @@
 /wandb
 /weights
 /lightning_logs
+val_paths.csv
+train_paths.csv
+test_paths.csv
+debug.py
+test_paths.csv
+clean_paths.py
