@@ -20,7 +20,7 @@ from loss.loss_utils import l1_loss, ssim
 class EspressoV2(L.LightningModule):
     def __init__(self, out_channels):
         super(EspressoV2, self).__init__()
-        self.lambda_loss = 1e-4
+        self.lambda_loss = 0.9
 
         self.sa1 = PointNetSetAbstraction(1024, 0.1, 32, 3 + 3, [32, 32, 64], False)
         self.sa2 = PointNetSetAbstraction(256, 0.2, 32, 64 + 3, [64, 64, 128], False)
@@ -57,12 +57,13 @@ class EspressoV2(L.LightningModule):
         l0_points = self.fp1(l0_xyz, l1_xyz, None, l1_points)
 
         x = self.drop1(F.relu(self.bn1(self.conv1(l0_points))))
-        x = 5*F.tanh(self.conv2(x))
+        x = l0_xyz + 3*F.tanh(self.conv2(x))
         # x = F.log_softmax(x, dim=1)
 
         x = x.permute(0, 2, 1)
 
-        means3D = means3D + x
+        # means3D = means3D + x
+        means3D = x
         # print(means3D)
         # exit(1)
 
@@ -88,25 +89,25 @@ class EspressoV2(L.LightningModule):
         output_im, output_means = self(means3D, opacity, scales, rotations, shs, active_sh_degree, FovX, FovY, world_view_transform, full_proj_transform, camera_center)
         loss_2d, loss_3d = self.compute_loss(output_im, target_im[0], output_means, target_means)
 
-        loss = (1.0 - self.lambda_loss) * loss_2d + 1 -  self.lambda_loss * (loss_3d)
+        loss = (1.0 - self.lambda_loss) * loss_2d +  self.lambda_loss * (loss_3d)
         self.log("train_loss", loss.item(), batch_size=1)
         self.log("train_2d_loss", loss_2d.item(), batch_size=1)
         self.log("train_3d_loss", loss_3d.item(), batch_size=1) 
 
-        return loss
+        return loss_3d
 
     def validation_step(self, batch, batch_idx):
         means3D,  opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc, target_im, target_means = batch
         output_im, output_means = self(means3D, opacity, scales, rotations, shs, active_sh_degree, FovX, FovY, world_view_transform, full_proj_transform, camera_center)
         loss_2d, loss_3d = self.compute_loss(output_im, target_im[0], output_means, target_means)
         
-        loss = (1.0 - self.lambda_loss) * loss_2d + 1 - self.lambda_loss * (loss_3d)
+        loss = (1.0 - self.lambda_loss) * loss_2d + self.lambda_loss * (loss_3d)
         self.log("val_loss", loss.item(), batch_size=1)
         self.log("val_2d_loss", loss_2d.item(), batch_size=1)
         self.log("val_3d_loss", loss_3d.item(), batch_size=1)
         
         
-        return loss
+        return loss_3d
     
     def inference_step(self, G, task_desc, FovX, FovY, world_view_transform, full_proj_transform, camera_center):
         with torch.no_grad():
@@ -121,14 +122,16 @@ class EspressoV2(L.LightningModule):
         """Compute loss for training and validation."""
         # l1 = l1_loss(output_im, target_im)
         # ssim_loss = ssim(output_im, target_im)
+        # loss_2d = ssim(output_im, target_im)
         # lambda_dssim = 0.2
 
         # print(target.device)
         # print(output_im.device)
         # loss_2d = (1.0 - lambda_dssim) * l1 + lambda_dssim * (1.0 - ssim_loss)
-        weight_l3d = 0.3
+        # weight_l3d = 0.3
         loss_2d = self.im_loss(output_im, target_im).sum()
-        loss_3d, loss_3d_normals = chamfer_distance(output_means, target_means, point_reduction="sum")
+        # loss_3d, loss_3d_normals = chamfer_distance(output_means, target_means, point_reduction="sum")
+        loss_3d, loss_3d_normals = chamfer_distance(output_means, target_means)
         # loss = loss_2d + weight_l3d*loss_3d
 
         gt = self.im_tf(target_im)

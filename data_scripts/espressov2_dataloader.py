@@ -120,6 +120,13 @@ def getProjectionMatrix(znear, zfar, fovX, fovY):
     P[2, 3] = -(zfar * znear) / (zfar - znear)
     return P
 
+def getWorld2View(R, t):
+    Rt = np.zeros((4, 4))
+    Rt[:3, :3] = R.transpose()
+    Rt[:3, 3] = t
+    Rt[3, 3] = 1.0
+    return np.float32(Rt)
+
 def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     Rt = np.zeros((4, 4))
     Rt[:3, :3] = R.transpose()
@@ -193,7 +200,8 @@ class EspressoDataset(Dataset):
         FovY = focal2fov(focal_length_y, height)
         FovX = focal2fov(focal_length_x, width)
 
-        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 0.1)).transpose(0, 1)
+        # world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 0.1)).transpose(0, 1)
+        world_view_transform = torch.tensor(getWorld2View(R, T)).transpose(0, 1)
         projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=FovX, fovY=FovY).transpose(0,1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         camera_center = world_view_transform.inverse()[3, :3]  
