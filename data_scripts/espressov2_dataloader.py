@@ -200,11 +200,21 @@ class EspressoDataset(Dataset):
         FovY = focal2fov(focal_length_y, height)
         FovX = focal2fov(focal_length_x, width)
 
-        # world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 0.1)).transpose(0, 1)
-        world_view_transform = torch.tensor(getWorld2View(R, T)).transpose(0, 1)
+        # print("222222222222222")
+        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
+        # print("111111111111111")
+        # world_view_transform = torch.tensor(getWorld2View(R, T)).transpose(0, 1)
         projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=FovX, fovY=FovY).transpose(0,1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         camera_center = world_view_transform.inverse()[3, :3]  
+
+
+        # print(f"wvt: {world_view_transform}")
+        # print(f"p: {projection_matrix}")
+        # print(f"fp: {full_proj_transform}")
+        # print(f"cc: {camera_center}")
+
+        # exit(1)
         
         # print(f"fovx :{FovX}")
         # print(f"fovy :{FovY}")
@@ -228,6 +238,7 @@ class EspressoDataset(Dataset):
         gt_means = splat.get_xyz
 
         means3D = splat.get_xyz
+        #juhu loves you.
         opacity = splat.get_opacity
         scales = splat.get_scaling
         shs = splat.get_features

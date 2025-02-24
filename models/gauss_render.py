@@ -35,6 +35,19 @@ class Renderer(nn.Module):
         tanfovx = math.tan(FovX * 0.5)
         tanfovy = math.tan(FovY * 0.5)
 
+        # print(f"height: {int(image_height)}")
+        # print(f"width: {int(image_width)}")
+        # print(f"tanfovx: {tanfovx}")
+        # print(f"tanfovy: {tanfovy}")
+        # print(f"bgcolor: {bg_color}")
+        # print(f"scaling_mod: {scaling_modifier}")
+        # print(f"viewmatrix: {world_view_transform}")
+        # print(f"projmatrix: {full_proj_transform}")
+        # print(f"sh_degree: {active_sh_degree}")
+        # print(f"campos: {camera_center}")
+        # print(f"prefiltered: }")
+        # print(f"debug: {pipe.debug}")
+
         raster_settings = GaussianRasterizationSettings(
             image_height=int(image_height),
             image_width=int(image_width),
@@ -55,6 +68,17 @@ class Renderer(nn.Module):
         means2D = screenspace_points
         cov3D_precomp = None
         colors_precomp = None
+
+        # print(f"means3d: {means3D.size()}")
+        # print(f"means2d: {means2D.size()}")
+        # print(f"shs: {shs.size()}")
+        # print(f"colors_precomp: {colors_precomp}")
+        # print(f"opacities: {opacity.size()}")
+        # print(f"scales: {scales.size()}")
+        # print(f"rotations: {rotations.size()}")
+        # print(f"cov3D_precomp: {cov3D_precomp}")
+
+        # exit(1)
 
         # Rasterize visible Gaussians to image, obtain their radii (on screen). 
         rendered_image, radii = rasterizer(

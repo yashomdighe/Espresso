@@ -31,18 +31,18 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_set, batch_size=1, shuffle=False)
     print("Obtained val set")
 
-    wandb_logger = WandbLogger()
-    wandb.login()
-    run = wandb.init(
-        # Set the project where this run will be logged
-        project="Espresso",
-        # name=f"v1",
-        # Track hyperparameters and run metadata
-        config={
-            "max_epochs": 200,
-        },
-    )
-    wandb.watch(model, log_freq=10, log="all")
+    # wandb_logger = WandbLogger()
+    # wandb.login()
+    # run = wandb.init(
+    #     # Set the project where this run will be logged
+    #     project="Espresso",
+    #     # name=f"v1",
+    #     # Track hyperparameters and run metadata
+    #     config={
+    #         "max_epochs": 200,
+    #     },
+    # )
+    # wandb.watch(model, log_freq=10, log="all")
     # saves top-K checkpoints based on "val_accuracy" metric
     checkpoint_callback = ModelCheckpoint(
         save_top_k=5,
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     trainer = L.Trainer(accelerator="cuda", 
                         devices=1,
-                        logger=wandb_logger,
+                        # logger=wandb_logger,
                         max_epochs=200,
                         check_val_every_n_epoch=2,
                         callbacks=callbacks,

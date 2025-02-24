@@ -9,6 +9,7 @@
 /wandb
 /weights
 /lightning_logs
+/renders/
 val_paths.csv
 train_paths.csv
 test_paths.csv

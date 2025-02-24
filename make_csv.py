@@ -40,21 +40,6 @@ if __name__ == "__main__":
                 }
             )
 
-            # break
-        # break
-            # subdirs = sorted([int(f.path.split("/")[-1]) for f in os.scandir(episode_path) if f.is_dir() and f.path.split("/")[-1] != "splat"])
-            # subdirs.pop('splat')
-            # for dir in subdirs:
-            #     if dir % 10 == 0:
-            #         paths.append(
-            #             {
-            #                 "input_splat": os.path.join(root, f"episode_{epi}", f"{dir}", "splat/point_cloud/iteration_7000"),
-            #                 "gt": os.path.join(root, f"episode_{epi}", f"{dir}", "images"),
-
-            #             }
-            #         )
-    # print(count)
-    # print(min(gt_epi_li))    
     print(f"Total Demos :{len(paths)}")
     shuffle(paths)
 

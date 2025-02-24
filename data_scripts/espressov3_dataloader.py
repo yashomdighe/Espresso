@@ -257,10 +257,12 @@ class EspressoDataset(Dataset):
 
         cam = self.rng.choice(self.cam_ids)
         img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
+        mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
         # img = Image.open(img_path)
         # img
         # print(img)
         image =  self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB))
+        mask =  self.tensor_transform(Image.open(mask_path))
         # cv2.imwrite("test1.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
         # image = self.tensor_transform(img)
         ext = self.get_extrinsics(cam)
@@ -268,4 +270,4 @@ class EspressoDataset(Dataset):
         
         world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
         # print(image.size())
-        return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, gt_means
+        return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, gt_means, mask
