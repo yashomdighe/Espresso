@@ -5,12 +5,13 @@ from pathlib import Path
 from random import shuffle
 if __name__ == "__main__":
 
-    root = "/home/ydighe/Developer/datasets/gaussian-splatting/slide_block_to_target/variation_0/"
+    root = "/home/yashom/Developer/datasets/gaussian-splatting/slide_block_to_target/variation_0/"
     paths = []
     for epi in range(10, 21):
         episode_path = os.path.join(root, f"episode_{epi}")
         # print(os.listdir(episode_path))
         subdirs = sorted([int(f.path.split("/")[-1]) for f in os.scandir(episode_path) if f.is_dir() and f.path.split("/")[-1] != "splat"])
+        subdirs = subdirs[1:]
         # subdirs.pop('splat')
         for dir in subdirs:
             if dir % 10 == 0:
