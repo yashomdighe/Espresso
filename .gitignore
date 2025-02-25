@@ -2,5 +2,17 @@
 *.ply
 *.png
 *.pyc
+*.pth
+*.pt
 /build
 /*.egg-info
+/wandb
+/weights
+/lightning_logs
+/renders/
+val_paths.csv
+train_paths.csv
+test_paths.csv
+debug.py
+test_paths.csv
+clean_paths.py

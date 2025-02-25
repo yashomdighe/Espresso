@@ -18,7 +18,6 @@ from rlbench.backend.utils import image_to_float_array, rgb_handles_to_mask
 from rlbench.utils import get_stored_demos
 
 
-
 def make_colmap_camera_params(intrinsics: np.ndarray, 
                             extrinsics: np.ndarray, 
                             cam_id: int,
@@ -163,7 +162,15 @@ if __name__=="__main__":
                 for cam_id, cam in cameras.items():
 
                     rgb = np.array(Image.open(demo_dict[f"{cam[0]}_rgb"]))
-                    # mask = rgb_handles_to_mask(np.array(Image.open(demo_dict[f"{cam[0]}_mask"])))                    # print(mask)
+                    bgr = cv2.cvtColor(np.array(Image.open(demo_dict[f"{cam[0]}_rgb"])), cv2.COLOR_RGB2BGR)
+                    mask = rgb_handles_to_mask(np.array(Image.open(demo_dict[f"{cam[0]}_mask"])))    
+                    obj_ids = list(np.unique(mask))
+                    # print(obj_ids)
+                    # for o_id, obj_id in enumerate(obj_ids):
+                    #     masked_image = (mask == obj_id)[..., None] * bgr
+                    #     os.makedirs(f'{cam[0]}/', exist_ok=True)
+                    #     cv2.imwrite(f'{cam[0]}/{obj_id}.png', masked_image)               
+                     # print(mask)
                     # obj_ids = list(np.unique(mask))
 
                     misc_dict = demo_dict["misc"]
@@ -190,8 +197,8 @@ if __name__=="__main__":
                     rgb = make_bg_transparent(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
                     cv2.imwrite(os.path.join(im_path,f"{cam[1]}.png"), rgb)
 
-                    # mask_img = 1 - np.isin(mask, mask_ids).astype(np.uint8)
-                    # cv2.imwrite(os.path.join(im_path,f"{cam[1]}_mask.png"), mask_img*255)
+                    mask_img = 1 - np.isin(mask, mask_ids).astype(np.uint8)
+                    cv2.imwrite(os.path.join(im_path,f"{cam[1]}_mask.png"), mask_img*255)
                     
                     intrinsics, extrinsics = make_colmap_camera_params(
                         misc_dict[f"{cam[0]}_camera_intrinsics"],
@@ -203,6 +210,7 @@ if __name__=="__main__":
                     intrinsics_li.append(intrinsics)
                     extrinsics_li.append(extrinsics)
                 # break
+                # exit(1)
                 intrinsics = np.vstack(intrinsics_li)
                 extrinsics = np.vstack(extrinsics_li)
 

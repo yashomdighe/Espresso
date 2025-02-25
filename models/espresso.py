@@ -5,6 +5,8 @@ import lightning as L
 import math
 from torchvision.transforms import ToTensor, ToPILImage
 
+from PIL import Image
+from torchvision.transforms import ToTensor, ToPILImage
 from models.attention import MultiHeadedAttention
 from models.gauss_render import Renderer
 from models.gaussian_model import GaussianModel
@@ -26,16 +28,24 @@ class Espresso(L.LightningModule):
         self.drop1 = nn.Dropout(0.4)
         self.fc2 = nn.Linear(2048, 8192)
         self.drop2 = nn.Dropout(0.4)
-        self.fc3 = nn.Linear(8192, 32768)
+        self.fc3 = nn.Linear(8192, 8192)
         self.drop3 = nn.Dropout(0.4)
-        self.fc4 = nn.Linear(32768, 150000)
+        self.fc4 = nn.Linear(8192, 131072)
         self.drop4 = nn.Dropout(0.4)
+        # self.fc5 = nn.Linear(131072, 131072)
+        # self.drop5 = nn.Dropout(0.4)
+        # self.fc4 = nn.Linear(32768, 150000)
+        # self.drop4 = nn.Dropout(0.4)
+        self.im_tf = ToPILImage()
         # self.fc5 = nn.Linear(131072, 150000)
         # self.drop5 = nn.Dropout(0.4)
 
-    def render( 
+        self.loss = nn.MSELoss()
+
+
+    def render(
             self,
-            means3D, opacity, scales, rotations, shs, active_sh_degree,
+            means3D, mask, opacity, scales, rotations, shs, active_sh_degree, 
             bg_color : torch.Tensor,
             FovX, FovY, 
             world_view_transform,
@@ -48,12 +58,6 @@ class Espresso(L.LightningModule):
             override_color = None, 
             use_trained_exp=False
         ):
-        """
-        Render the scene. 
-        
-        Background tensor (bg_color) must be on GPU!
-        """
-        # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
         try:
             screenspace_points.retain_grad()
@@ -73,7 +77,7 @@ class Espresso(L.LightningModule):
             scale_modifier=scaling_modifier,
             viewmatrix=world_view_transform,
             projmatrix=full_proj_transform,
-            sh_degree= active_sh_degree,
+            sh_degree=active_sh_degree,
             campos=camera_center,
             prefiltered=False,
             debug=False
@@ -81,25 +85,9 @@ class Espresso(L.LightningModule):
 
         rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
-        # means3D = pc.get_xyz
         means2D = screenspace_points
-        # opacity = pc.get_opacity
-
-        # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
-        # scaling / rotation by the rasterizer.
         cov3D_precomp = None
-
-        # scales = pc.get_scaling
-        # rotations = pc.get_rotation
-
-        # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
-        # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
-        # shs = None
         colors_precomp = None
-        # if override_color is None:  
-                # shs = shs
-        # else:
-            # colors_precomp = override_color
 
         # Rasterize visible Gaussians to image, obtain their radii (on screen). 
         rendered_image, radii = rasterizer(
@@ -112,15 +100,9 @@ class Espresso(L.LightningModule):
             rotations = rotations,
             cov3D_precomp = cov3D_precomp)
 
-        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
-        # They will be excluded from value updates used in the splitting criteria.
-        # return {"render": rendered_image,
-        #         "viewspace_points": screenspace_points,
-        #         "visibility_filter" : radii > 0,
-        #         "radii": radii}
         return rendered_image
     
-    def forward(self, means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc, inference=False):
+    def forward(self, means3D, mask, opacity, scales, rotations, shs, active_sh_degree, task_desc, FovX, FovY, world_view_transform, full_proj_transform, camera_center, inference=False):
         # xyz = G.get_xyz
         # xyz, mask = self.pad_input(xyz, target_size=150000)
         # G._xyz = xyz
@@ -129,27 +111,28 @@ class Espresso(L.LightningModule):
         tokens = self.tokenizer(task_desc, return_tensors='pt', truncation=True, max_length=128)
         # tokens = {key: value.to(self.device) for key, value in tokens.items()}
         text_emb = self.text_proj(self.text_encoder(**tokens.to("cuda")).text_embeds)
-        # means3D = means3D[None,:,:]
+        # xyz = xyz[None,:,:]
         pcd_emb = self.pcd_encoder(means3D.transpose(2, 1))
 
-        # print(text_emb.size())
-        # print(pcd_emb.size())
-        x = self.mha1(text_emb, pcd_emb, pcd_emb)
-        x = self.drop1(self.fc1(x))
-        x = self.drop2(self.fc2(x.reshape(3, 2048)))
-        x = self.drop3(self.fc3(x))
+        x = F.relu(self.mha1(text_emb, pcd_emb, pcd_emb))
+        x = F.relu(self.drop1(self.fc1(x)))
+        x = F.relu(self.drop2(self.fc2(x.reshape(3,2048))))
+        x = F.relu(self.drop3(self.fc3(x)))
         # x = self.drop4(self.fc4(x))
-        x = torch.mul(mask, self.drop4(self.fc4(x)))
-        x = x.reshape(150000, 3)
-        # print(G._xyz.size())
-        # print(x.size())
-        means3D += x
+        # x = self.drop4(self.fc4(x))
+        # x = torch.mul(mask, self.drop4(self.fc4(x)))
+        x = torch.mul(mask, 2*F.tanh(self.drop4(self.fc4(x))))
+
+        # G._xyz = G._xyz + x
+        means3D += x.reshape(131072,3)
+        # print(means3D)
+        # exit(1)
 
         if inference:
-            return means3D, mask, opacity, scales, rotations, shs
-        
+            return means3D
+
         rendered_img = self.render(
-            means3D[0], opacity[0], scales[0], rotations[0], shs[0], active_sh_degree[0],
+            means3D[0], mask[0], opacity[0], scales[0], rotations[0], shs[0], active_sh_degree[0],
             torch.tensor([0, 0, 0], dtype=torch.float32, device=self.device),
             FovX,
             FovY,
@@ -162,22 +145,20 @@ class Espresso(L.LightningModule):
         return rendered_img
 
     def training_step(self, batch, batch_idx):
+
         means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc, target = batch
         # print(task_desc, type(task_desc))
-        output = self(means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc)
+        output = self(means3D, mask, opacity, scales, rotations, shs, active_sh_degree, task_desc, FovX, FovY, world_view_transform, full_proj_transform, camera_center)
         loss = self.compute_loss(output, target[0])
-        # save = ToPILImage()(output)
-        # save.save("render.png")
-        self.log("train_loss", loss)
+        self.log("train_loss", loss.item())
 
         return loss
 
     def validation_step(self, batch, batch_idx):
         means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc, target = batch
-        output = self(means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc)
-        loss = self.compute_loss(output, target)
-        self.log("val_loss", loss)
-
+        output = self(means3D, mask, opacity, scales, rotations, shs, active_sh_degree, task_desc, FovX, FovY, world_view_transform, full_proj_transform, camera_center)
+        loss = self.compute_loss(output, target[0])
+        self.log("val_loss", loss.item())
         return loss
     
     def inference_step(self, means3D, mask, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, task_desc):
@@ -192,16 +173,17 @@ class Espresso(L.LightningModule):
 
     def compute_loss(self, output, target):
         """Compute loss for training and validation."""
-        # print(target.size())
-        # print(output.size())
-        l1 = l1_loss(output, target)
-        ssim_loss = ssim(output, target)
-        # gt = ToPILImage()(target)
-        # gt.save("gt.png")
-        lambda_dssim = 0.2
+        # l1 = l1_loss(output, target)
+        # ssim_loss = ssim(output, target)
+        # lambda_dssim = 0.2
+        op = self.im_tf(output)
+        op.save("render.png")
+
+        gt = self.im_tf(target)
+        gt.save("gt.png")
         
-        loss = (1.0 - lambda_dssim) * l1 + lambda_dssim * (1.0 - ssim_loss)
-        return loss
+        # loss = (1.0 - lambda_dssim) * l1 + lambda_dssim * (1.0 - ssim_loss)
+        return self.loss(output, target).sum()
 
 
 
