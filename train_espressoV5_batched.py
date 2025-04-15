@@ -56,7 +56,7 @@ def espresso_collate_fn_no_pad(batch):
 if __name__ == "__main__":
 
     # model = EspressoV2.load_from_checkpoint("/home/ydighe/Developer/Espresso/weights/espresso_v1/espresso_v1-epoch=27-val_acc=0.00.ckpt", out_channels=3)
-    version = "v5.4b"
+    version = "v5.5_b"
     loss_type = "masked_mse + fast rigid (radius 1e-2)"
     model = EspressoV5(out_channels=3, version=version)
 
@@ -102,14 +102,14 @@ if __name__ == "__main__":
     # callbacks.append(early_stop_callback)
     callbacks = [checkpoint_callback, ModelSummary(max_depth=2), early_stop_callback]
 
-    trainer = L.Trainer(accelerator="cuda", 
-                        devices=1,
+    trainer = L.Trainer(accelerator="auto", 
+                        devices=2,
                         logger=wandb_logger,
                         max_epochs=200,
                         check_val_every_n_epoch=2,
                         log_every_n_steps=4,
                         callbacks=callbacks,
-                        fast_dev_run=False)
+                        fast_dev_run=False,)
 
     # Train Model
     trainer.fit(model, train_loader, val_loader)
