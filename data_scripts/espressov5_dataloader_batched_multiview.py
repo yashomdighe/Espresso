@@ -1,6 +1,3 @@
-# TO DO modify the network and dataloader to not use a Gaussian model object but just use the individual tensors
-# means, sh_degree etc
-
 import os 
 import torch 
 import pandas as pd
@@ -13,6 +10,7 @@ import cv2
 from torch.utils.data import Dataset
 
 from models.gaussian_model import GaussianModel
+from plyfile import PlyData
 
 from torchvision.transforms import ToTensor
 
@@ -141,6 +139,121 @@ def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     
     return np.float32(Rt)
 
+
+
+def load_from_ply(path: str, max_sh_degree: int = 3, device: str = "cuda"):
+    plydata = PlyData.read(path)
+    el = plydata.elements[0]
+
+    xyz = np.stack([np.asarray(el["x"]), np.asarray(el["y"]), np.asarray(el["z"])], axis=1)
+    opacity = np.asarray(el["opacity"])[..., np.newaxis]
+    mask = np.asarray(el["mask"])
+    features_dc = np.zeros((xyz.shape[0], 3, 1))
+    features_dc[:, 0, 0] = np.asarray(el["f_dc_0"])
+    features_dc[:, 1, 0] = np.asarray(el["f_dc_1"])
+    features_dc[:, 2, 0] = np.asarray(el["f_dc_2"])
+
+    extra_f_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("f_rest_")]
+    extra_f_names = sorted(extra_f_names, key = lambda x: int(x.split('_')[-1]))
+    assert len(extra_f_names)==3*(max_sh_degree + 1) ** 2 - 3
+    features_extra = np.zeros((xyz.shape[0], len(extra_f_names)))
+    for idx, attr_name in enumerate(extra_f_names):
+        features_extra[:, idx] = np.asarray(plydata.elements[0][attr_name])
+    # Reshape (P,F*SH_coeffs) to (P, F, SH_coeffs except DC)
+    features_extra = features_extra.reshape((features_extra.shape[0], 3, (max_sh_degree + 1) ** 2 - 1))
+    # print(features_dc.shape)
+    # print(features_extra.shape)
+    features = np.concatenate((np.transpose(features_dc, (0, 2, 1)), np.transpose(features_extra, (0, 2, 1))), axis=1)
+    
+    scale_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")]
+    scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))
+    scales = np.zeros((xyz.shape[0], len(scale_names)))
+    for idx, attr_name in enumerate(scale_names):
+        scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
+
+    rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]
+    rot_names = sorted(rot_names, key = lambda x: int(x.split('_')[-1]))
+    rots = np.zeros((xyz.shape[0], len(rot_names)))
+    for idx, attr_name in enumerate(rot_names):
+        rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
+
+
+    return {
+        "xyz": torch.tensor(xyz, dtype=torch.float32, device=device),
+        "opacity": torch.tensor(opacity, dtype=torch.float32, device=device),
+        "scaling": torch.tensor(scales, dtype=torch.float32, device=device),
+        "rotation": torch.tensor(rots, dtype=torch.float32, device=device),
+        "features": torch.tensor(features, dtype=torch.float32, device=device),  # [P, 3, SH]
+        "mask": torch.tensor(mask, dtype=torch.float32, device=device),
+        "active_sh_degree": max_sh_degree,
+    }
+
+def get_gauss_params(path: str, max_sh_degree: int = 3):
+
+    splat = GaussianModel(max_sh_degree)
+    # splat_path = os.path.join(self.paths_frame.iloc[idx, 0], "point_cloud.ply")
+    # splat.load_ply(splat_path)
+    splat.load_ply(path)
+    means3D = splat.get_xyz
+    #juhu loves you.
+    opacity = splat.get_opacity
+    scales = splat.get_scaling
+    shs = splat.get_features
+    rotations = splat.get_rotation
+    active_sh_degree = splat.active_sh_degree
+    pt_mask = splat.get_mask
+
+    return {
+        "xyz": means3D,
+        "opacity": opacity,
+        "scaling": scales,
+        "rotation": rotations,
+        "features": shs,
+        "mask": pt_mask,
+        "active_sh_degree": active_sh_degree,
+    }
+
+def espresso_collate_fn(batch):
+    """
+    Pads and stacks a batch of samples from EspressoDataset.
+    Each item in the batch is a tuple like:
+        (means3D, opacity, scales, rotations, shs, active_sh_degree, ...)
+    """
+
+    # Unzip batch
+    (means3D, opacity, scales, rotations, shs, active_sh_degree,
+     world_view_transform, full_proj_transform, camera_center,
+     FovX, FovY, prompt, image, gt_means, pt_mask, im_mask) = zip(*batch)
+
+    # Find max number of points
+    max_pts = max(max(m.shape[0] for m in means3D), max(gt_m.shape[0] for gt_m in gt_means))
+
+    # print(max_pts)
+
+    # Pad all variable-length tensors to max_pts
+    means3D = torch.stack([pad_tensor(m, max_pts, 0.0) for m in means3D])
+    opacity = torch.stack([pad_tensor(o, max_pts, 0.0) for o in opacity])
+    scales = torch.stack([pad_tensor(s, max_pts, 0.0) for s in scales])
+    rotations = torch.stack([pad_rotations(r, max_pts) for r in rotations])
+    shs = torch.stack([pad_tensor(sh, max_pts, 0.0) for sh in shs])
+    pt_mask = torch.stack([pad_tensor(mask, max_pts, 0.0) for mask in pt_mask])
+    gt_means = torch.stack([pad_tensor(gt, max_pts, 0.0) for gt in gt_means])
+
+    # Stack everything else
+    active_sh_degree = torch.tensor(active_sh_degree)
+    world_view_transform = torch.stack(world_view_transform)
+    full_proj_transform = torch.stack(full_proj_transform)
+    camera_center = torch.stack(camera_center)
+    FovX = torch.stack(FovX)
+    FovY = torch.stack(FovY)
+    image = torch.stack(image)
+    im_mask = torch.stack(im_mask)
+
+    return (means3D, opacity, scales, rotations, shs, active_sh_degree,
+            world_view_transform, full_proj_transform, camera_center,
+            FovX, FovY, prompt, image, gt_means, pt_mask, im_mask)
+
+
 class EspressoDataset(Dataset):
     """RL Bench data loader for project codenamed espresso"""
 
@@ -162,6 +275,8 @@ class EspressoDataset(Dataset):
         }
 
         self.tensor_transform = ToTensor()
+    
+
 
     def get_extrinsics(self, cam_id):
         image_name, params = self.cameras[cam_id]
@@ -200,8 +315,9 @@ class EspressoDataset(Dataset):
         focal_length_y = intr.params[1]
         FovY = focal2fov(focal_length_y, height)
         FovX = focal2fov(focal_length_x, width)
-        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
 
+        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
+        
         projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=FovX, fovY=FovY).transpose(0,1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         camera_center = world_view_transform.inverse()[3, :3]  
@@ -216,32 +332,54 @@ class EspressoDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+        gaussian_param = get_gauss_params(self.paths_frame.iloc[idx, 0], max_sh_degree=0)
 
-        splat = GaussianModel(0)
-        splat.load_ply(self.paths_frame.iloc[idx, 0])
-        means3D = splat.get_xyz
-        #juhu loves you.
-        opacity = splat.get_opacity
-        scales = splat.get_scaling
-        shs = splat.get_features
-        rotations = splat.get_rotation
-        active_sh_degree = splat.active_sh_degree
-        pt_mask = splat.get_mask
+        # Access individual tensors
+        means3D = gaussian_param["xyz"]
+        opacity = gaussian_param["opacity"]
+        scales = gaussian_param["scaling"]
+        rotations = gaussian_param["rotation"]
+        shs = gaussian_param["features"]
+        pt_mask = gaussian_param["mask"]
+        active_sh_degree = gaussian_param["active_sh_degree"]
 
-        gt_splat = GaussianModel(0)
-        gt_splat.load_ply(self.paths_frame.iloc[idx, 2])
-        gt_means = gt_splat.get_xyz
+        pred_gaussian_param = get_gauss_params(self.paths_frame.iloc[idx, 2], max_sh_degree=0)
+        pred_means = pred_gaussian_param["xyz"]
 
-        cam = self.rng.choice(self.cam_ids)
-        img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
-        mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
+        # cam = self.rng.choice(self.cam_ids)
+        images = []
+        im_masks = []
+        world_view_transforms = []
+        full_proj_transforms = []
+        camera_centers = []
+        FovXs = []
+        FovYs = []
+        for cam in self.cam_ids:
+            img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
+            mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
 
-        image =  self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB))
-        im_mask =  self.tensor_transform(Image.open(mask_path))
+            images.append(self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)))
+            im_masks.append(self.tensor_transform(Image.open(mask_path)))
+            
+            ext = self.get_extrinsics(cam)
+            intr = self.get_intrinsics(cam)
+            world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
+
+            world_view_transforms.append(world_view_transform)
+            full_proj_transforms.append(full_proj_transform)
+            camera_centers.append(camera_center)
+            FovXs.append(FovX)
+            FovYs.append(FovY)
+            
+        image = torch.stack(images)
+        im_mask = torch.stack(im_masks)
+
+        world_view_transform = torch.stack(world_view_transforms)
+        full_proj_transform = torch.stack(full_proj_transforms)
+        camera_center = torch.stack(camera_centers)
+        FovX = torch.tensor(FovXs)
+        FovY = torch.tensor(FovYs)
+
         
-        ext = self.get_extrinsics(cam)
-        intr = self.get_intrinsics(cam)
-        
-        world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
-
-        return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, gt_means, pt_mask ,im_mask
+        # print(image.size())
+        return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, pred_means, pt_mask, im_mask

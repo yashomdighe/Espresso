@@ -199,13 +199,29 @@ class EspressoDataset(Dataset):
         focal_length_x = intr.params[0]
         focal_length_y = intr.params[1]
         FovY = focal2fov(focal_length_y, height)
+        # print(f"FovY: {FovY}")
+        # print(f"fy: {focal_length_y}")
         FovX = focal2fov(focal_length_x, width)
-        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
+        # print(f"FovX: {FovX}")
+        # print(f"fx: {focal_length_x}")
 
+        # print("222222222222222")
+        world_view_transform = torch.tensor(getWorld2View2(R, T, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
+        # print("111111111111111")
+        # world_view_transform = torch.tensor(getWorld2View(R, T)).transpose(0, 1)
         projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=FovX, fovY=FovY).transpose(0,1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         camera_center = world_view_transform.inverse()[3, :3]  
 
+        # print(f"wvt: {world_view_transform}")
+        # print(f"p: {projection_matrix}")
+        # print(f"fp: {full_proj_transform}")
+        # print(f"cc: {camera_center}")
+
+        # exit(1)
+        
+        # print(f"fovx :{FovX}")
+        # print(f"fovy :{FovY}")
         return world_view_transform, full_proj_transform, camera_center, FovX, FovY
 
     def __len__(self):
@@ -217,7 +233,9 @@ class EspressoDataset(Dataset):
             idx = idx.tolist()
 
 
-        splat = GaussianModel(0)
+        splat = GaussianModel(3)
+        # splat_path = os.path.join(self.paths_frame.iloc[idx, 0], "point_cloud.ply")
+        # splat.load_ply(splat_path)
         splat.load_ply(self.paths_frame.iloc[idx, 0])
         means3D = splat.get_xyz
         #juhu loves you.
@@ -228,20 +246,28 @@ class EspressoDataset(Dataset):
         active_sh_degree = splat.active_sh_degree
         pt_mask = splat.get_mask
 
-        gt_splat = GaussianModel(0)
+        gt_splat = GaussianModel(3)
         gt_splat.load_ply(self.paths_frame.iloc[idx, 2])
         gt_means = gt_splat.get_xyz
+        # gt_opacity = gt_splat.get_opacity
+        # gt_scales = gt_splat.get_scaling
+        # gt_shs = gt_splat.get_features
+        # gt_rotations = gt_splat.get_rotation
+        # gt_active_sh_degree = gt_splat.active_sh_degree
 
         cam = self.rng.choice(self.cam_ids)
         img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
         mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
-
+        # img = Image.open(img_path)
+        # img
+        # print(img)
         image =  self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB))
         im_mask =  self.tensor_transform(Image.open(mask_path))
-        
+        # cv2.imwrite("test1.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        # image = self.tensor_transform(img)
         ext = self.get_extrinsics(cam)
         intr = self.get_intrinsics(cam)
         
         world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
-
+        # print(image.size())
         return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, gt_means, pt_mask ,im_mask

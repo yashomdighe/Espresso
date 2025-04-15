@@ -232,16 +232,38 @@ class EspressoDataset(Dataset):
         gt_splat.load_ply(self.paths_frame.iloc[idx, 2])
         gt_means = gt_splat.get_xyz
 
-        cam = self.rng.choice(self.cam_ids)
-        img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
-        mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
+        # cam = self.rng.choice(self.cam_ids)
+        images = []
+        im_masks = []
+        world_view_transforms = []
+        full_proj_transforms = []
+        camera_centers = []
+        FovXs = []
+        FovYs = []
+        for cam in self.cam_ids:
+            img_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}.png")
+            mask_path = os.path.join(self.paths_frame.iloc[idx, 1], f"{self.cameras[cam][0]}_mask.png")
 
-        image =  self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB))
-        im_mask =  self.tensor_transform(Image.open(mask_path))
-        
-        ext = self.get_extrinsics(cam)
-        intr = self.get_intrinsics(cam)
-        
-        world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
+            images.append(self.tensor_transform(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)))
+            im_masks.append(self.tensor_transform(Image.open(mask_path)))
+            
+            ext = self.get_extrinsics(cam)
+            intr = self.get_intrinsics(cam)
+            world_view_transform, full_proj_transform, camera_center, FovX, FovY = self.get_rasterization_settings(ext, intr)
+
+            world_view_transforms.append(world_view_transform)
+            full_proj_transforms.append(full_proj_transform)
+            camera_centers.append(camera_center)
+            FovXs.append(FovX)
+            FovYs.append(FovY)
+            
+        image = torch.stack(images)
+        im_mask = torch.stack(im_masks)
+
+        world_view_transform = torch.stack(world_view_transforms)
+        full_proj_transform = torch.stack(full_proj_transforms)
+        camera_center = torch.stack(camera_centers)
+        FovX = torch.tensor(FovXs)
+        FovY = torch.tensor(FovYs)
 
         return means3D, opacity, scales, rotations, shs, active_sh_degree, world_view_transform, full_proj_transform, camera_center, FovX, FovY, "slide red block to green target", image, gt_means, pt_mask ,im_mask
