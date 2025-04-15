@@ -16,3 +16,4 @@ test_paths.csv
 debug.py
 test_paths.csv
 clean_paths.py
+*.csv
