@@ -8,9 +8,9 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 import wandb
 from lightning.pytorch.loggers import WandbLogger
 from models.pointnet2_cls_ssg import PointNet2 as pointnet
-from models.espressoV5 import EspressoV5
+from models.espressoV5_multiview import EspressoV5
 
-from data_scripts.espressov5_dataloader import EspressoDataset
+from data_scripts.espressov5_dataloader_multiview import EspressoDataset
 
 from torch.utils.data import DataLoader
 import warnings
@@ -21,7 +21,7 @@ torch.set_float32_matmul_precision('high')
 if __name__ == "__main__":
 
     # model = EspressoV2.load_from_checkpoint("/home/ydighe/Developer/Espresso/weights/espresso_v1/espresso_v1-epoch=27-val_acc=0.00.ckpt", out_channels=3)
-    version = "v5_7"
+    version = "v5_7_multiview"
     loss_type = "im_loss + masked_mse + new rigid (radius 1e-2)"
     model = EspressoV5(out_channels=3, version=version)
 
@@ -30,9 +30,9 @@ if __name__ == "__main__":
     train_set = EspressoDataset("train_paths2.csv", )
     val_set = EspressoDataset("val_paths2.csv", )
 
-    train_loader = DataLoader(train_set, batch_size=1, shuffle=True)
+    train_loader = DataLoader(train_set, batch_size=1, shuffle=True, num_workers=8)
     print("Obtained train set")
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=8)
     print("Obtained val set")
 
     wandb.finish()
@@ -47,13 +47,12 @@ if __name__ == "__main__":
         },
         log_model="all"
     )
-    # saves top-K checkpoints based on "val_accuracy" metric
     checkpoint_callback = ModelCheckpoint(
         save_top_k=5,
         monitor="val_loss",
         mode="min",
         dirpath=f"./weights/espresso_{version}",
-        filename="espresso_{version}_{epoch:02d}_{val_loss:.2f}",
+        filename="espresso_{version}-{epoch:02d}-{val_loss:.2f}",
     )
 
     early_stop_callback = EarlyStopping(
@@ -64,12 +63,12 @@ if __name__ == "__main__":
         mode="min")
     
     # callbacks.append(early_stop_callback)
-    callbacks = [checkpoint_callback,
+    callbacks = [checkpoint_callback, 
                  early_stop_callback,
                  ]
 
     trainer = L.Trainer(accelerator="gpu", 
-                        devices=[0],
+                        devices=[1],
                         logger=wandb_logger,
                         max_epochs=200,
                         check_val_every_n_epoch=2,

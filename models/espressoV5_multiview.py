@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from models.pointnet2_utils import PointNetSetAbstraction, PointNetFeaturePropagation
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,11 +10,13 @@ import os
 from PIL import Image
 import torchvision
 from torchvision.transforms import ToTensor, ToPILImage
-from models.gauss_render_batched import Renderer
-# from models.gaussian_model import GaussianModel
-# from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
-# from pytorch3d.loss import chamfer_distance
-from loss.loss_utils import l1_loss, ssim, rigid_loss
+from models.gauss_render_multiview import Renderer
+from models.gaussian_model import GaussianModel
+from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+from pytorch3d.loss import chamfer_distance
+from loss.loss_utils import l1_loss, ssim, rigidity_loss2, local_rigid_loss
+from scipy.spatial import cKDTree
+from torch_cluster import radius_graph, knn_graph
 
 class EspressoV5(L.LightningModule):
     def __init__(self, out_channels, version):
@@ -58,14 +61,13 @@ class EspressoV5(L.LightningModule):
         x = self.drop1(F.relu(self.bn1(self.conv1(l0_points))))
 
         # print(x.size())
-        x = l0_xyz + F.tanh(self.conv2(x))
-        # x = l0_xyz + self.conv2(x)
+        # x = l0_xyz + 0.5*F.tanh(self.conv2(x))
+        x = l0_xyz + self.conv2(x)
         # # x = F.log_softmax(x, dim=1)
-        # print(x.shape)
 
         x = x.permute(0, 2, 1) * pt_mask.unsqueeze(-1)
         # print(x.size(), pt_mask.size())
-        # print
+
         # # print(x.size())
         means3D = means3D + x
         # means3D = x
@@ -75,8 +77,8 @@ class EspressoV5(L.LightningModule):
         if inference:
             return x
 
-        rendered_img, _ = self.renderer(
-            means3D, opacity, scales, rotations, shs, active_sh_degree,
+        rendered_img = self.renderer(
+            means3D[0], opacity[0], scales[0], rotations[0], shs[0], active_sh_degree[0],
             torch.tensor([0, 0, 0], dtype=torch.float32, device=self.device),
             FovX,
             FovY,
@@ -84,6 +86,7 @@ class EspressoV5(L.LightningModule):
             full_proj_transform,
             camera_center,
         )
+
         # exit(1)
         return rendered_img, means3D, x
 
@@ -95,14 +98,15 @@ class EspressoV5(L.LightningModule):
         
         # loss_2d, loss_3d, loss_rigid = self.compute_loss(output_im, target_im[0], output_means, target_means, means3D, mask, deltas, batch_idx, "train")
         # loss = loss_2d + loss_3d + loss_rigid
-        loss_2d, loss_rigid = self.compute_loss(output_im, target_im, output_means, target_means, means3D, im_mask, deltas, batch_idx, "train")
-        loss = loss_2d + loss_rigid
+        loss_2d_im, loss_2d_masked, loss_rigid = self.compute_loss(output_im, target_im[0], output_means, target_means, means3D, im_mask, pt_mask, deltas, batch_idx, "train")
+        loss = loss_2d_im + 3.0*loss_2d_masked + 4.0*loss_rigid
 
-        self.log("train_loss", loss.item(), batch_size=1, sync_dist=True)
-        self.log("train_2d_loss", loss_2d.item(), batch_size=1, sync_dist=True)
-        # self.log("train_2d_mask_loss", loss_2d_masked.item(), batch_size=1)
+        self.log("train_loss", loss.item(), batch_size=1)
+        self.log("train_2d_loss", loss_2d_im.item(), batch_size=1)
+        # self.log("train_2d_loss", loss_2d_masked.item(), batch_size=1)
+        self.log("train_2d_mask_loss", loss_2d_masked.item(), batch_size=1)
         # self.log("train_3d_loss", loss_3d.item(), batch_size=1) 
-        self.log("train_rigid_loss", loss_rigid.item(), batch_size=1, sync_dist=True) 
+        self.log("train_rigid_loss", loss_rigid.item(), batch_size=1) 
 
         return loss
 
@@ -112,14 +116,15 @@ class EspressoV5(L.LightningModule):
 
         # loss_2d, loss_3d, loss_rigid = self.compute_loss(output_im, target_im[0], output_means, target_means, means3D, mask, deltas, batch_idx, "val")
         # loss = loss_2d + loss_3d + loss_rigid
-        loss_2d, loss_rigid = self.compute_loss(output_im, target_im, output_means, target_means, means3D, im_mask, deltas, batch_idx, "val")
-        loss = loss_2d + loss_rigid
+        loss_2d_im, loss_2d_masked, loss_rigid = self.compute_loss(output_im, target_im[0], output_means, target_means, means3D, im_mask, pt_mask, deltas, batch_idx, "val")
+        loss = loss_2d_im + 3.0*loss_2d_masked + 4.0*loss_rigid
         # loss = (1.0 - self.lambda_loss) * loss_2d + self.lambda_loss * (loss_3d)
-        self.log("val_loss", loss.item(), batch_size=1, sync_dist=True)
-        self.log("val_2d_loss", loss_2d.item(), batch_size=1, sync_dist=True)
-        # self.log("val_2d_mask_loss", loss_2d_masked.item(), batch_size=1)
+        self.log("val_loss", loss.item(), batch_size=1)
+        self.log("val_2d_loss", loss_2d_im.item(), batch_size=1)
+        # self.log("val_2d_loss", loss_2d_masked.item(), batch_size=1)
+        self.log("val_2d_mask_loss", loss_2d_masked.item(), batch_size=1)
         # self.log("val_3d_loss", loss_3d.item(), batch_size=1)
-        self.log("train_rigid_loss", loss_rigid.item(), batch_size=1, sync_dist=True)
+        self.log("train_rigid_loss", loss_rigid.item(), batch_size=1)
         
         return loss
     
@@ -132,10 +137,16 @@ class EspressoV5(L.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-    def compute_loss(self, output_im, target_im, output_means, target_means, input_means, mask, deltas, batch_idx, type):
+    def compute_loss(self, output_im, target_im, output_means, target_means, input_means, mask, pt_mask, deltas, batch_idx, type):
         """Compute loss for training and validation."""
-        
-        
+
+        V, C, H, W = output_im.shape  # B=batch size, V=6 views
+
+        # print(output_im.shape)
+        # exit(1)
+        # output_flat = output_im.view(B * V, C, H, W)
+        # target_flat = target_im.view(B * V, C, H, W)
+        # mask_flat = mask.view(B * V, 1, H, W).float()
         l1 = l1_loss(output_im, target_im)
         ssim_loss = ssim(output_im, target_im)
         # loss_2d = ssim(output_im, target_im)
@@ -143,9 +154,11 @@ class EspressoV5(L.LightningModule):
         loss_2d_im = (1.0 - lambda_dssim) * l1 + lambda_dssim * (1.0 - ssim_loss)
 
         #######################
-        #Masked MSE
+        # Masked MSE
         #######################
         mask = mask.float()
+
+        # # Compute the squared error
         squared_error = (target_im - output_im) ** 2
 
         # # Use torch.where to filter only masked pixels
@@ -153,21 +166,38 @@ class EspressoV5(L.LightningModule):
 
         # # Compute the mean of the non-zero elements
         loss_2d_masked = masked_squared_error.sum() / mask.sum()
+        # loss_2d = 0.8 * loss_2d_im + 0.2 * loss_2d_masked
 
-        loss_2d = 0.8 * loss_2d_im + 0.2 * loss_2d_masked
         #######################
         # Rigidity Regularization
         #######################
-        loss_rigid = rigid_loss(input_means, deltas, 1e-1)
+        masked_ind = torch.where(pt_mask.squeeze(0)==1)
+        src, dst = radius_graph(input_means.detach().squeeze(0)[masked_ind], r=1e-2)
+        # src, dst = knn_graph(input_means.detach().squeeze(0)[masked_ind], k=20, loop=True)
+        # print(input_means.shape)
+        # print(torch.unique(src).shape)
+        # print(src.shape)
+        # print(input_means.squeeze(0).shape)
+        prev_diff = input_means.squeeze(0)[src] - input_means.squeeze(0)[dst]
+        # print(prev_diff.shape)
+        curr_diff = output_means.squeeze(0)[src] - output_means.squeeze(0)[dst]
+        # print(curr_diff.shape)
+
+        loss_rigid = torch.mean(torch.sqrt(torch.sum((prev_diff - curr_diff) ** 2, dim=1)+ 1e-20))
+        # print(loss_rigid)
+        # print(((prev_diff - curr_diff) ** 2).shape)
+        # exit(1)
+        # print(diff.shape)
+        # exit(1)
 
         cmp = torch.cat((target_im, output_im), dim=2)
         if not os.path.exists(f"output/{self.version}/renders/{type}/{self.current_epoch}"):
             os.makedirs(f"output/{self.version}/renders/{type}/{self.current_epoch}")
         # torchvision.utils.save_image(cmp, "comparison.png")
         torchvision.utils.save_image(cmp, f"output/{self.version}/renders/{type}/{self.current_epoch}/comparison{batch_idx}.png")
-        del(cmp)
 
-        return loss_2d, loss_rigid
+        # return loss_2d, loss_rigid
+        return loss_2d_im, loss_2d_masked, loss_rigid
         # return loss_2d, loss_3d, loss_rigid
         # return self.loss(output, target).sum()
 
